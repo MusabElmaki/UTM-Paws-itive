@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # utm_pawsitive
 
 A new Flutter project.
@@ -15,3 +16,7 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+=======
+# UTM-Paws-itive
+UTM Paws-itive is a mobile application developed using Flutter and Firebase to support stray animal reporting and management within Universiti Teknologi Malaysia (UTM).
+>>>>>>> 4afcd88fb93b0df0d8f2bd97a867e8142d6d0f40
