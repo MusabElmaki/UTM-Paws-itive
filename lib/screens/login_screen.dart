@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'leaderboard_screen.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -38,23 +40,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      Navigator.pushReplacementNamed(context, '/report');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LeaderboardScreen()),
+      );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message ?? 'Login failed'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message ?? 'Login failed')));
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Login failed: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Login failed: $e')));
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -89,9 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Login'),
-      ),
+      appBar: AppBar(title: const Text('Login')),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -100,11 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 40),
 
-              Icon(
-                Icons.pets,
-                size: 90,
-                color: Theme.of(context).primaryColor,
-              ),
+              Icon(Icons.pets, size: 90, color: Theme.of(context).primaryColor),
 
               const SizedBox(height: 20),
 
@@ -112,8 +107,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 'Welcome Back',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
 
               const SizedBox(height: 10),

@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../theme/app_theme.dart';
+import 'leaderboard_screen.dart';
 
 class ReportAnimalScreen extends StatefulWidget {
   const ReportAnimalScreen({super.key});
@@ -139,17 +140,34 @@ class _ReportAnimalScreenState extends State<ReportAnimalScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
+      // Update user's points
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
+            'points': FieldValue.increment(100),
+            'lastActivityAt': FieldValue.serverTimestamp(),
+          });
+
+      // Create a notification for the user
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'userId': user.uid,
+        'title': 'Report Submitted Successfully!',
+        'message': 'Thank you for reporting the animal. Our team is on it.',
+        'type': 'reportUpdate',
+        'isRead': false,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
       if (!mounted) return;
 
       Navigator.pushNamed(context, '/success');
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to submit report: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to submit report: $e')));
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -174,11 +192,25 @@ class _ReportAnimalScreenState extends State<ReportAnimalScreen> {
         title: const Text('Report Animal'),
         actions: [
           TextButton(
-            onPressed: _loading ? null : _clear,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const LeaderboardScreen(),
+              ),
+            ),
             child: const Text(
-              'Clear',
+              'Leaderboard (Temp)',
               style: TextStyle(color: Colors.white),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            onPressed: () => Navigator.pushNamed(context, '/notifications'),
+            tooltip: 'Notifications',
+          ),
+          TextButton(
+            onPressed: _loading ? null : _clear,
+            child: const Text('Clear', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -191,8 +223,8 @@ class _ReportAnimalScreenState extends State<ReportAnimalScreen> {
               Text(
                 'Animal Photo *',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: AppTheme.text.withValues(alpha: 0.72),
-                    ),
+                  color: AppTheme.text.withValues(alpha: 0.72),
+                ),
               ),
 
               const SizedBox(height: 8),
@@ -206,8 +238,7 @@ class _ReportAnimalScreenState extends State<ReportAnimalScreen> {
                     color: AppTheme.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color:
-                          showImageError ? AppTheme.error : AppTheme.border,
+                      color: showImageError ? AppTheme.error : AppTheme.border,
                       width: showImageError ? 1.8 : 1.2,
                     ),
                   ),
@@ -223,22 +254,17 @@ class _ReportAnimalScreenState extends State<ReportAnimalScreen> {
                             const SizedBox(height: 10),
                             Text(
                               'Tap to Upload Photo',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    color: AppTheme.primary,
-                                  ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(color: AppTheme.primary),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Image will be saved in Firestore for Sprint 2',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: AppTheme.text
-                                        .withValues(alpha: 0.48),
+                                    color: AppTheme.text.withValues(
+                                      alpha: 0.48,
+                                    ),
                                   ),
                             ),
                           ],
@@ -261,9 +287,9 @@ class _ReportAnimalScreenState extends State<ReportAnimalScreen> {
                   child: Text(
                     'Animal photo is required before submitting',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.error,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      color: AppTheme.error,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
 
@@ -277,10 +303,8 @@ class _ReportAnimalScreenState extends State<ReportAnimalScreen> {
                 ),
                 items: _types
                     .map(
-                      (type) => DropdownMenuItem(
-                        value: type,
-                        child: Text(type),
-                      ),
+                      (type) =>
+                          DropdownMenuItem(value: type, child: Text(type)),
                     )
                     .toList(),
                 onChanged: _loading
@@ -331,10 +355,8 @@ class _ReportAnimalScreenState extends State<ReportAnimalScreen> {
                 ),
                 items: _statuses
                     .map(
-                      (status) => DropdownMenuItem(
-                        value: status,
-                        child: Text(status),
-                      ),
+                      (status) =>
+                          DropdownMenuItem(value: status, child: Text(status)),
                     )
                     .toList(),
                 onChanged: _loading
@@ -369,10 +391,9 @@ class _ReportAnimalScreenState extends State<ReportAnimalScreen> {
                       child: Text(
                         'Your report will be reviewed by UTM animal welfare volunteers.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color:
-                                  AppTheme.text.withValues(alpha: 0.68),
-                              height: 1.45,
-                            ),
+                          color: AppTheme.text.withValues(alpha: 0.68),
+                          height: 1.45,
+                        ),
                       ),
                     ),
                   ],

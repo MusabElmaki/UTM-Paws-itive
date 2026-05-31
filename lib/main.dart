@@ -5,6 +5,8 @@ import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/report_animal_screen.dart';
 import 'screens/report_success_screen.dart';
+import 'screens/leaderboard_screen.dart';
+import 'screens/notification_center_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -24,12 +26,16 @@ class PawsitiveApp extends StatelessWidget {
       title: 'UTM Paws-itive',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      // home: const NotificationCenterScreen(),
+      // initialRoute: '/splash',
       initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/report': (context) => const ReportAnimalScreen(),
         '/success': (context) => const ReportSuccessScreen(),
+        '/leaderboard': (context) => const LeaderboardScreen(),
+        '/notifications': (context) => const NotificationCenterScreen(),
       },
     );
   }
