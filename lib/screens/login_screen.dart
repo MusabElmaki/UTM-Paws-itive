@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '../theme/app_theme.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,8 +9,12 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _formKey = GlobalKey<FormState>();
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -20,71 +23,160 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (!mounted) return;
+
+     Navigator.pushReplacementNamed(
+  context,
+  '/home',
+);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'Login failed'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Login failed: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  String? _emailValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Email is required';
+    }
+
+    if (!value.contains('@')) {
+      return 'Enter a valid email';
+    }
+
+    return null;
+  }
+
+  String? _passwordValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Password is required';
+    }
+
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
+      appBar: AppBar(
+        title: const Text('Login'),
+      ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(22),
-          children: [
-            const SizedBox(height: 24),
-            Text(
-              'Welcome back',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Log in to view and report campus animal sightings.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.text.withValues(alpha: 0.62),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              const SizedBox(height: 40),
+
+              Icon(
+                Icons.pets,
+                size: 90,
+                color: Theme.of(context).primaryColor,
               ),
-            ),
-            const SizedBox(height: 28),
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                hintText: 'student@utm.my',
-                prefixIcon: Icon(Icons.person),
+
+              const SizedBox(height: 20),
+
+              Text(
+                'Welcome Back',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                hintText: 'Enter password',
-                prefixIcon: Icon(Icons.lock),
+
+              const SizedBox(height: 10),
+
+              Text(
+                'Login to continue using UTM Paws-itive',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Wrong credentials will appear here in the demo.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.error.withValues(alpha: 0.78),
+
+              const SizedBox(height: 40),
+
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email),
+                ),
+                validator: _emailValidator,
               ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/home',
-                  (route) => false,
-                );
-              },
-              icon: const Icon(Icons.login),
-              label: const Text('Login'),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () => Navigator.pushNamed(context, '/register'),
-              child: const Text('Create new account'),
-            ),
-          ],
+
+              const SizedBox(height: 18),
+
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: Icon(Icons.lock),
+                ),
+                validator: _passwordValidator,
+              ),
+
+              const SizedBox(height: 28),
+
+              ElevatedButton.icon(
+                onPressed: _loading ? null : _login,
+                icon: _loading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.login),
+                label: Text(_loading ? 'Logging in...' : 'Login'),
+              ),
+
+              const SizedBox(height: 16),
+
+              TextButton(
+                onPressed: _loading
+                    ? null
+                    : () {
+                        Navigator.pushNamed(context, '/register');
+                      },
+                child: const Text('Create Account'),
+              ),
+            ],
+          ),
         ),
       ),
     );

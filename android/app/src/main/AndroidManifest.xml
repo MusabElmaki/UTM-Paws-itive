@@ -1,6 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET"/>
-
+    <!-- tflite_flutter requires hardware acceleration (already enabled below) -->
     <application
         android:label="utm_pawsitive"
         android:name="${applicationName}"

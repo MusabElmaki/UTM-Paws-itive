@@ -1,10 +1,9 @@
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../models/animal.dart';
 import '../theme/app_theme.dart';
-import '../widgets/animal_card.dart';
-import '../widgets/empty_state.dart';
-import 'animal_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,238 +13,382 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _selectedFilter = 'All';
-  String _query = '';
+  String selectedFilter = 'All';
+  String searchText = '';
 
-  static const _filters = ['All', 'Cats', 'Dogs', 'Healthy', 'Needs Help'];
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.background,
 
-  static const _animals = [
-    Animal(
-      id: '1',
-      name: 'Cat near Library',
-      type: 'Cat',
-      location: 'UTM Library',
-      status: 'Healthy',
-      description:
-          'A calm campus cat was resting near the library entrance. It appears healthy, alert, and comfortable around students.',
-      dateReported: '3 May 2026',
-      reportedBy: 'Aina Rahman',
-    ),
-    Animal(
-      id: '2',
-      name: 'Cat at Kolej 9',
-      type: 'Cat',
-      location: 'Kolej 9',
-      status: 'Needs Feeding',
-      description:
-          'Thin cat spotted around the Kolej 9 walkway. It stayed near the food court and may need feeding.',
-      dateReported: '3 May 2026',
-      reportedBy: 'Daniel Tan',
-    ),
-    Animal(
-      id: '3',
-      name: 'Dog near Stadium',
-      type: 'Dog',
-      location: 'UTM Stadium',
-      status: 'Injured',
-      description:
-          'Dog seen limping near the stadium parking area. It is alert but keeps distance from people.',
-      dateReported: '3 May 2026',
-      reportedBy: 'Nur Iman',
-    ),
-  ];
+      appBar: AppBar(
+        title: const Text('UTM Paws-itive'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.pushNamed(
+                context,
+                '/notifications',
+              );
+            },
+            icon: const Icon(Icons.notifications),
+          ),
 
-  List<Animal> get _visibleAnimals {
-    final normalizedQuery = _query.trim().toLowerCase();
-    return _animals.where((animal) {
-      final matchesFilter = switch (_selectedFilter) {
-        'Cats' => animal.isCat,
-        'Dogs' => animal.isDog,
-        'Healthy' => animal.status == 'Healthy',
-        'Needs Help' => animal.needsHelp,
-        _ => true,
-      };
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.pushNamed(
+                  context,
+                  '/profile',
+                );
+              },
+              child: const CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Icon(
+                  Icons.person,
+                  color: AppTheme.primary,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
 
-      if (!matchesFilter) {
-        return false;
-      }
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.pushNamed(
+            context,
+            '/report',
+          );
+        },
+        icon: const Icon(Icons.pets),
+        label: const Text('Report Animal'),
+      ),
 
-      if (normalizedQuery.isEmpty) {
-        return true;
-      }
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: AppTheme.primary,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(28),
+                bottomRight: Radius.circular(28),
+              ),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome Back 👋',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Animal Reports',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-      final searchableText = [
-        animal.name,
-        animal.type,
-        animal.location,
-        animal.status,
-        animal.description,
-        animal.reportedBy,
-      ].join(' ').toLowerCase();
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              onChanged: (value) {
+                setState(() {
+                  searchText = value.toLowerCase();
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search location or animal...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
 
-      return searchableText.contains(normalizedQuery);
-    }).toList();
-  }
+          SizedBox(
+            height: 50,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _filterChip('All'),
+                _filterChip('Cat'),
+                _filterChip('Dog'),
+                _filterChip('Unknown'),
+              ],
+            ),
+          ),
 
-  void _openProfile(Animal animal) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => AnimalProfileScreen(animal: animal),
+          const SizedBox(height: 10),
+
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('reports')
+                  .orderBy(
+                    'createdAt',
+                    descending: true,
+                  )
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error: ${snapshot.error}',
+                    ),
+                  );
+                }
+
+                if (!snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                final reports = snapshot.data!.docs;
+
+                final filteredReports = reports.where((doc) {
+                  final data =
+                      doc.data() as Map<String, dynamic>;
+
+                  final animalType =
+                      (data['animalType'] ?? '')
+                          .toString();
+
+                  final location =
+                      (data['location'] ?? '')
+                          .toString()
+                          .toLowerCase();
+
+                  final description =
+                      (data['description'] ?? '')
+                          .toString()
+                          .toLowerCase();
+
+                  final filterMatch =
+                      selectedFilter == 'All'
+                          ? true
+                          : animalType ==
+                              selectedFilter;
+
+                  final searchMatch =
+                      searchText.isEmpty ||
+                          location.contains(
+                            searchText,
+                          ) ||
+                          description.contains(
+                            searchText,
+                          );
+
+                  return filterMatch &&
+                      searchMatch;
+                }).toList();
+
+                if (filteredReports.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment:
+                          MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.pets,
+                          size: 80,
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'No reports found',
+                          style: TextStyle(
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredReports.length,
+                  itemBuilder: (context, index) {
+                    final report =
+                        filteredReports[index].data()
+                            as Map<String, dynamic>;
+
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/animal-profile',
+                          arguments:
+                              filteredReports[index].id,
+                        );
+                      },
+                      child: Card(
+                        margin:
+                            const EdgeInsets.only(
+                          bottom: 16,
+                        ),
+                        child: Padding(
+                          padding:
+                              const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius:
+                                    BorderRadius.circular(
+                                  12,
+                                ),
+                                child:
+                                    report['imageBase64'] !=
+                                            null
+                                        ? Image.memory(
+                                            base64Decode(
+                                              report[
+                                                  'imageBase64'],
+                                            ),
+                                            width: 100,
+                                            height: 100,
+                                            fit:
+                                                BoxFit.cover,
+                                          )
+                                        : Container(
+                                            width: 100,
+                                            height: 100,
+                                            color:
+                                                Colors.grey,
+                                            child:
+                                                const Icon(
+                                              Icons.pets,
+                                            ),
+                                          ),
+                              ),
+
+                              const SizedBox(
+                                  width: 12),
+
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    Text(
+                                      report[
+                                              'animalType'] ??
+                                          'Unknown',
+                                      style:
+                                          const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight:
+                                            FontWeight.bold,
+                                      ),
+                                    ),
+
+                                    const SizedBox(
+                                        height: 8),
+
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons
+                                              .location_on,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(
+                                            width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            report[
+                                                    'location'] ??
+                                                '',
+                                            maxLines: 2,
+                                            overflow:
+                                                TextOverflow
+                                                    .ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    const SizedBox(
+                                        height: 8),
+
+                                    Container(
+                                      padding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      decoration:
+                                          BoxDecoration(
+                                        color: AppTheme
+                                            .primary
+                                            .withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius:
+                                            BorderRadius.circular(
+                                          20,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        report[
+                                                'healthStatus'] ??
+                                            '',
+                                        style:
+                                            const TextStyle(
+                                          fontWeight:
+                                              FontWeight
+                                                  .bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final visibleAnimals = _visibleAnimals;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Animal Reports'),
-        actions: [
-          IconButton(
-            tooltip: 'Profile',
-            onPressed: () => Navigator.pushNamed(context, '/profile'),
-            icon: const Icon(Icons.person),
-          ),
-          IconButton(
-            tooltip: 'Logout',
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                '/login',
-                (route) => false,
-              );
-            },
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.pushNamed(context, '/report'),
-        icon: const Icon(Icons.pets),
-        label: const Text('Report Animal'),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-              color: AppTheme.primary,
-              child: Column(
-                children: [
-                  TextField(
-                    onChanged: (value) => setState(() => _query = value),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Search animals near campus...',
-                      hintStyle: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.72),
-                      ),
-                      prefixIcon: const Icon(Icons.search, color: Colors.white),
-                      suffixIcon: const Icon(
-                        Icons.filter_list,
-                        color: Colors.white,
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withValues(alpha: 0.16),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.20),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.65),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final filter in _filters) ...[
-                          FilterChip(
-                            label: Text(filter),
-                            selected: _selectedFilter == filter,
-                            onSelected: (_) {
-                              setState(() => _selectedFilter = filter);
-                            },
-                            selectedColor: Colors.white,
-                            backgroundColor: Colors.white.withValues(
-                              alpha: 0.14,
-                            ),
-                            labelStyle: TextStyle(
-                              color: _selectedFilter == filter
-                                  ? AppTheme.primary
-                                  : Colors.white,
-                              fontWeight: FontWeight.w800,
-                            ),
-                            side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.24),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
-              child: Row(
-                children: [
-                  Text(
-                    '${visibleAnimals.length} '
-                    '${visibleAnimals.length == 1 ? 'animal' : 'animals'} found',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const Spacer(),
-                  const Icon(
-                    Icons.filter_list,
-                    color: AppTheme.primary,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _selectedFilter,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelMedium?.copyWith(color: AppTheme.primary),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: visibleAnimals.isEmpty
-                  ? EmptyState(
-                      title: 'No animals found',
-                      message: 'Try a different search or filter.',
-                      onPressed: () => Navigator.pushNamed(context, '/report'),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 96),
-                      itemBuilder: (context, index) {
-                        final animal = visibleAnimals[index];
-                        return AnimalCard(
-                          animal: animal,
-                          onTap: () => _openProfile(animal),
-                        );
-                      },
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 12),
-                      itemCount: visibleAnimals.length,
-                    ),
-            ),
-          ],
-        ),
+  Widget _filterChip(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selectedFilter == label,
+        onSelected: (_) {
+          setState(() {
+            selectedFilter = label;
+          });
+        },
       ),
     );
   }

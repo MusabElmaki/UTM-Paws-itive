@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -9,11 +11,14 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
   String? _role = 'Student';
+  bool _loading = false;
 
   static const _roles = ['Student', 'Staff', 'Volunteer'];
 
@@ -26,21 +31,130 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _register() {
+  Future<void> _register() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account created successfully')),
-    );
-    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+    setState(() => _loading = true);
+
+    try {
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      final user = userCredential.user;
+
+      if (user == null) {
+        throw Exception('User creation failed');
+      }
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+  'name': _nameController.text.trim(),
+  'email': _emailController.text.trim(),
+  'role': _role,
+  'volunteerScore': 0,
+  'reportsCount': 0,
+  'healthStatus': 'Active',
+  'createdAt': FieldValue.serverTimestamp(),
+});
+
+      await FirebaseAuth.instance.signOut();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully. Please login.'),
+        ),
+      );
+
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/login',
+        (route) => false,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'Registration failed'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Registration failed: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  String? _required(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'This field is required';
+    }
+
+    return null;
+  }
+
+  String? _emailValidator(String? value) {
+    final requiredMessage = _required(value);
+
+    if (requiredMessage != null) {
+      return requiredMessage;
+    }
+
+    if (!value!.contains('@')) {
+      return 'Enter a valid email';
+    }
+
+    return null;
+  }
+
+  String? _passwordValidator(String? value) {
+    final requiredMessage = _required(value);
+
+    if (requiredMessage != null) {
+      return requiredMessage;
+    }
+
+    if (value!.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+
+    return null;
+  }
+
+  String? _confirmPasswordValidator(String? value) {
+    final requiredMessage = _required(value);
+
+    if (requiredMessage != null) {
+      return requiredMessage;
+    }
+
+    if (value != _passwordController.text) {
+      return 'Passwords do not match';
+    }
+
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Register Account')),
+      appBar: AppBar(
+        title: const Text('Register Account'),
+      ),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -51,7 +165,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 'Create your account',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
+
               const SizedBox(height: 22),
+
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -60,7 +176,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 validator: _required,
               ),
+
               const SizedBox(height: 14),
+
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -68,9 +186,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   labelText: 'Email',
                   prefixIcon: Icon(Icons.email),
                 ),
-                validator: _required,
+                validator: _emailValidator,
               ),
+
               const SizedBox(height: 14),
+
               TextFormField(
                 controller: _passwordController,
                 obscureText: true,
@@ -78,9 +198,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   labelText: 'Password',
                   prefixIcon: Icon(Icons.lock),
                 ),
-                validator: _required,
+                validator: _passwordValidator,
               ),
+
               const SizedBox(height: 14),
+
               TextFormField(
                 controller: _confirmPasswordController,
                 obscureText: true,
@@ -88,18 +210,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   labelText: 'Confirm Password',
                   prefixIcon: Icon(Icons.lock_outline),
                 ),
-                validator: (value) {
-                  final requiredMessage = _required(value);
-                  if (requiredMessage != null) {
-                    return requiredMessage;
-                  }
-                  if (value != _passwordController.text) {
-                    return 'Passwords do not match';
-                  }
-                  return null;
-                },
+                validator: _confirmPasswordValidator,
               ),
+
               const SizedBox(height: 14),
+
               DropdownButtonFormField<String>(
                 initialValue: _role,
                 decoration: const InputDecoration(
@@ -108,22 +223,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 items: _roles
                     .map(
-                      (role) =>
-                          DropdownMenuItem(value: role, child: Text(role)),
+                      (role) => DropdownMenuItem(
+                        value: role,
+                        child: Text(role),
+                      ),
                     )
                     .toList(),
-                onChanged: (value) => setState(() => _role = value),
+                onChanged: (value) {
+                  setState(() => _role = value);
+                },
                 validator: _required,
               ),
+
               const SizedBox(height: 24),
+
               ElevatedButton.icon(
-                onPressed: _register,
-                icon: const Icon(Icons.person_add),
-                label: const Text('Register'),
+                onPressed: _loading ? null : _register,
+                icon: _loading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.person_add),
+                label: Text(_loading ? 'Creating account...' : 'Register'),
               ),
+
               const SizedBox(height: 12),
+
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: _loading
+                    ? null
+                    : () {
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/login',
+                          (route) => false,
+                        );
+                      },
                 child: const Text('Already have an account? Login'),
               ),
             ],
@@ -131,12 +268,5 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
     );
-  }
-
-  String? _required(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'This field is required';
-    }
-    return null;
   }
 }
